@@ -1057,5 +1057,65 @@ async def meme_tts(e):
         await bot.send_file(e.chat_id, 'k.mp3', voice_note=True)
         os.remove("k.mp3")
         await e.delete()
+from telethon import utils
+@bot.on(events.NewMessage(outgoing=True, pattern='.whois (.+)'))
+@bot.on(events.MessageEdited(outgoing=True, pattern='.whois (.+)'))
+async def whois(e):
+    user = e.pattern_match.group(1)
+    user = int(user) if user[1:].isdigit() else user
+    try: entity = await bot.get_entity(user)
+    except: return
+    name = utils.get_display_name(entity)
+    username = f'@{entity.username}' if entity.username else 'No username'
+    id = entity.id
+
+    await e.edit(f'Name: {name}\n**Username: {username}\n**ID: [{id}](tg://user?id={id})')
+from telethon import events
+@bot.on(events.NewMessage(pattern=r"\.tagall", outgoing=True))
+async def _(event):
+    if event.fwd_from:
+        return
+    await event.delete()
+    mentions = "@tagall"
+    chat = await event.get_input_chat()
+    async for x in bot.iter_participants(chat, 100):
+        mentions += f"[\u2063](tg://user?id={x.id})"
+    await bot.send_message(
+chat, mentions, reply_to=event.message.reply_to_msg_id)
+from telethon import events
+from telethon.tl.types import ChannelParticipantsAdmins, ChatParticipantCreator
+from telethon.errors import ChatAdminRequiredError, InputUserDeactivatedError
+
+
+@bot.on(events.NewMessage(pattern=".get_admin ?(.*)", outgoing=True))
+async def _(event):
+    if event.fwd_from:
+        return
+    mentions = "Admins in this Chat: \n"
+    input_str = event.pattern_match.group(1)
+    to_write_chat = await event.get_input_chat()
+    chat = None
+    if not input_str:
+        chat = to_write_chat
+    else:
+        mentions = "Admins in {} channel: \n".format(input_str)
+        try:
+            chat = await bot.get_entity(input_str)
+        except ValueError as e:
+            await event.edit(str(e))
+            return None
+    try:
+        async for x in bot.iter_participants(chat, filter=ChannelParticipantsAdmins):
+            if not x.deleted:
+                mentions += f"\n[{x.first_name}](tg://user?id={x.id})"
+            else:
+                mentions += f"\n InputUserDeactivatedError"
+    except ChatAdminRequiredError as e:
+        mentions += " " + str(e) + "\n"
+    await bot.send_message(
+        to_write_chat,
+        mentions,
+        reply_to=event.message.reply_to_msg_id
+)
 if len(sys.argv) < 2:
     bot.run_until_disconnected()
